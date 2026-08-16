@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-ink-line;
+  }
+  body {
+    background-image:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent 200px);
+  }
+  :focus-visible {
+    outline: 2px solid theme("colors.sand.DEFAULT");
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Ruled "scorecard row" — the recurring structural motif across every
+     admin table: a hairline rule and a mono tabular-figure column for
+     any numeric field, echoing a paper scorecard's ruled rows. */
+  .score-row {
+    @apply border-b border-ink-line/70 last:border-b-0;
+  }
+  .score-num {
+    @apply font-mono tabular-nums text-sm;
+  }
+  .stamp {
+    @apply inline-flex items-center gap-1.5 rounded-card border px-2 py-0.5 text-xs font-medium tracking-wide;
+  }
+  .stamp-fairway {
+    @apply stamp border-fairway/40 bg-fairway/10 text-fairway-soft;
+  }
+  .stamp-flag {
+    @apply stamp border-flag/40 bg-flag/10 text-flag-soft;
+  }
+  .stamp-sand {
+    @apply stamp border-sand/40 bg-sand/10 text-sand;
+  }
+  .panel {
+    @apply rounded-card border border-ink-line bg-ink-soft;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-card bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-dim disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-card border border-ink-line px-4 py-2 text-sm font-medium text-paper transition hover:border-paper/40 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .input {
+    @apply rounded-card border border-ink-line bg-ink px-3 py-2 text-sm text-paper placeholder:text-paper/40 focus:border-sand;
+  }
+}
