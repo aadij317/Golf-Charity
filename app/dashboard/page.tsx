@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import ScoreForm from "./score-form";
-import ScoreRow from "./score-row";
+import ScoreManager from "./score-manager";
 import ProofUpload from "./proof-upload";
 import SiteHeader from "@/components/site-header";
 import BillingPortalButton from "./billing-portal-button";
@@ -70,8 +69,7 @@ export default async function DashboardPage({
       <div className="panel overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-line p-6 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">Your latest scores</p><h2 className="mt-2 font-display text-3xl">Keep your five current.</h2><p className="mt-2 text-xs leading-5 text-ink/50">Scores are displayed newest first. Adding a sixth score automatically removes the oldest one.</p></div><span className="stamp-fairway">{scoreCount} of 5</span></div>
         <div className="p-6">
-          {scores && scores.length > 0 ? <ul className="rounded-xl border border-line bg-paper/45 px-4">{scores.map((s) => <ScoreRow key={s.id} id={s.id} score={s.score} scoreDate={s.score_date} disabled={!isActive} />)}</ul> : <div className="rounded-xl border border-dashed border-line bg-paper/40 p-8 text-center"><p className="font-display text-xl">No scores yet.</p><p className="mt-2 text-xs text-ink/50">Your next score will start your rolling record.</p></div>}
-          <ScoreForm disabled={!isActive} />
+          <ScoreManager scores={scores ?? []} disabled={!isActive} />
         </div>
       </div>
 
