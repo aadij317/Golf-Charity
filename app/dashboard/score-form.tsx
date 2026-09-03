@@ -1,21 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function ScoreForm({ disabled = false }: { disabled?: boolean }) {
+type Score = {
+  id: string;
+  score: number;
+  score_date: string;
+};
+
+export default function ScoreForm({
+  disabled = false,
+  editingScore = null,
+  onCancelEdit,
+  onSaved,
+}: {
+  disabled?: boolean;
+  editingScore?: Score | null;
+  onCancelEdit?: () => void;
+  onSaved?: () => void;
+}) {
   const router = useRouter();
+  const todayIso = () => new Date().toISOString().slice(0, 10);
   const [score, setScore] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const maxDate = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(todayIso);
+  const maxDate = todayIso();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isEditing = editingScore != null;
+
+  // Populate the form when the user clicks Edit on a row, and reset it
+  // back to a blank "add" state when editing is cancelled/finished.
+  useEffect(() => {
+    if (editingScore) {
+      setScore(String(editingScore.score));
+      setDate(editingScore.score_date);
+      setError(null);
+    } else {
+      setScore("");
+      setDate(todayIso());
+    }
+  }, [editingScore]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
+    // The API upserts on (user_id, score_date), so submitting the same
+    // date the user is editing updates that row instead of creating a
+    // new one — this one call covers both add and edit.
     const res = await fetch("/api/scores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -30,8 +65,17 @@ export default function ScoreForm({ disabled = false }: { disabled?: boolean }) 
     }
 
     setScore("");
+    setDate(todayIso());
     setLoading(false);
+    onSaved?.();
     router.refresh();
+  }
+
+  function handleCancel() {
+    setScore("");
+    setDate(todayIso());
+    setError(null);
+    onCancelEdit?.();
   }
 
   if (disabled) {
@@ -68,10 +112,27 @@ export default function ScoreForm({ disabled = false }: { disabled?: boolean }) 
           className="input w-full"
         />
       </div>
-      <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "Saving…" : "Add / Edit"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button type="submit" disabled={loading} className="btn-primary">
+          {loading ? "Saving…" : isEditing ? "Save changes" : "Add / Edit"}
+        </button>
+        {isEditing && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={loading}
+            className="btn-ghost"
+          >
+            Cancel
+          </button>
+        )}
       </div>
+      </div>
+      {isEditing && (
+        <p className="mt-3 text-xs text-ink/50">
+          Editing the score for {new Date(`${date}T00:00:00`).toLocaleDateString()}.
+        </p>
+      )}
       {error && <p className="mt-3 text-xs text-flag">{error}</p>}
     </form>
   );
