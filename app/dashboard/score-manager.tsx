@@ -45,6 +45,7 @@ export default function ScoreManager({
       ) : (
         <div className="rounded-xl border border-dashed border-line bg-paper/40 p-8 text-center">
           <p className="font-display text-xl">No scores yet.</p>
+
           <p className="mt-2 text-xs text-ink/50">
             Your next score will start your rolling record.
           </p>
