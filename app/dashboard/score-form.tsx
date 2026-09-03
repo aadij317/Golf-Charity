@@ -7,6 +7,7 @@ export default function ScoreForm({ disabled = false }: { disabled?: boolean }) 
   const router = useRouter();
   const [score, setScore] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const maxDate = new Date().toISOString().slice(0, 10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +62,7 @@ export default function ScoreForm({ disabled = false }: { disabled?: boolean }) 
         <input
           type="date"
           required
+          max={maxDate}
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="input w-full"

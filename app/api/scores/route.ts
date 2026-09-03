@@ -65,6 +65,11 @@ export async function POST(req: NextRequest) {
   if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== score_date) {
     return NextResponse.json({ error: "score_date must be a valid calendar date" }, { status: 400 });
   }
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  if (score_date > todayIso) {
+    return NextResponse.json({ error: "score_date cannot be in the future" }, { status: 400 });
+  }
 
   const { data, error } = await supabase
     .from("scores")

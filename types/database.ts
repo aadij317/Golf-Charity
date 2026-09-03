@@ -313,6 +313,87 @@ export interface Database {
           }
         ];
       };
+      subscription_charity_contributions: {
+        Row: {
+          id: string;
+          user_id: string;
+          charity_id: string;
+          subscription_id: string | null;
+          stripe_invoice_id: string;
+          currency: string;
+          gross_amount: number;
+          contribution_pct: number;
+          amount: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          charity_id: string;
+          subscription_id?: string | null;
+          stripe_invoice_id: string;
+          currency?: string;
+          gross_amount: number;
+          contribution_pct: number;
+          amount: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          charity_id?: string;
+          subscription_id?: string | null;
+          stripe_invoice_id?: string;
+          currency?: string;
+          gross_amount?: number;
+          contribution_pct?: number;
+          amount?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      draw_simulations: {
+        Row: {
+          id: string;
+          month: string;
+          draw_type: "random" | "algorithmic";
+          algorithm_weighting: "favor_rare" | "favor_common" | null;
+          snapshot: Json;
+          created_by: string;
+          expires_at: string;
+          published_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          month: string;
+          draw_type: "random" | "algorithmic";
+          algorithm_weighting?: "favor_rare" | "favor_common" | null;
+          snapshot: Json;
+          created_by: string;
+          expires_at: string;
+          published_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          month?: string;
+          draw_type?: "random" | "algorithmic";
+          algorithm_weighting?: "favor_rare" | "favor_common" | null;
+          snapshot?: Json;
+          created_by?: string;
+          expires_at?: string;
+          published_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      subscription_checkout_locks: {
+        Row: { user_id: string; stripe_session_id: string | null; expires_at: string; created_at: string };
+        Insert: { user_id: string; stripe_session_id?: string | null; expires_at: string; created_at?: string };
+        Update: { user_id?: string; stripe_session_id?: string | null; expires_at?: string; created_at?: string };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

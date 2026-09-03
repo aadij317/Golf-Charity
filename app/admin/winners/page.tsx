@@ -45,6 +45,10 @@ export default async function WinnersPage({
     { key: "rejected", label: "Rejected" },
   ];
 
+  const emptyLabel = filter && filter !== "all"
+    ? `No ${filters.find((item) => item.key === filter)?.label.toLowerCase() ?? filter} winners in this view.`
+    : "No winners have been created yet.";
+
   return (
     <div>
       <PageHeader eyebrow="04 · Winners management" title="Winners" />
@@ -82,7 +86,7 @@ export default async function WinnersPage({
             {(!winners || winners.length === 0) && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-ink/40">
-                  No winners in this view yet.
+                  {emptyLabel}
                 </td>
               </tr>
             )}

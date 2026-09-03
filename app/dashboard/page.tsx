@@ -5,6 +5,7 @@ import ScoreForm from "./score-form";
 import ScoreRow from "./score-row";
 import ProofUpload from "./proof-upload";
 import SiteHeader from "@/components/site-header";
+import BillingPortalButton from "./billing-portal-button";
 
 export default async function DashboardPage({
   searchParams,
@@ -15,12 +16,14 @@ export default async function DashboardPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: subscription }, { data: scores }, { data: drawEntries }, { data: winnings }] = await Promise.all([
+  const [{ data: profile }, { data: subscription }, { data: scores }, { data: drawEntries }, { data: winnings }, { data: charityContributions }, { data: latestPublishedDraw }] = await Promise.all([
     supabase.from("profiles").select("full_name,email").eq("id", user.id).single(),
-    supabase.from("subscriptions").select("plan,status,current_period_end,charity_contribution_pct,charities(name)").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("subscriptions").select("plan,status,current_period_end,stripe_customer_id,charity_id,charity_contribution_pct,charities(name)").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("scores").select("id,score,score_date").eq("user_id", user.id).order("score_date", { ascending: false }),
     supabase.from("draw_entries").select("id,matched_tier,draws(month,draw_type)").eq("user_id", user.id).order("created_at", { ascending: false }),
     supabase.from("winners").select("id,tier,prize_amount,proof_url,verification_status,payment_status,draws(month)").eq("user_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("subscription_charity_contributions").select("amount,charity_id").eq("user_id", user.id),
+    supabase.from("draws").select("month").eq("status", "published").order("month", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const isActive =
@@ -28,10 +31,18 @@ export default async function DashboardPage({
     (!subscription.current_period_end || new Date(subscription.current_period_end).getTime() > Date.now());
   const scoreCount = scores?.length ?? 0;
   const entryCount = drawEntries?.length ?? 0;
-  const totalWon = (winnings ?? []).reduce((sum, w) => sum + Number(w.prize_amount), 0);
-  const totalPaid = (winnings ?? []).filter((w) => w.payment_status === "paid").reduce((sum, w) => sum + Number(w.prize_amount), 0);
+  const payableWinnings = (winnings ?? []).filter((w) => w.verification_status !== "rejected");
+  const totalWon = payableWinnings.reduce((sum, w) => sum + Number(w.prize_amount), 0);
+  const totalPaid = payableWinnings.filter((w) => w.payment_status === "paid").reduce((sum, w) => sum + Number(w.prize_amount), 0);
   const charityName = (subscription as any)?.charities?.name as string | undefined;
-  const nextDrawMonth = new Date(); nextDrawMonth.setMonth(nextDrawMonth.getMonth() + 1, 1);
+  const recordedCharityContributions = (charityContributions ?? []).filter((contribution: any) => contribution.charity_id === subscription?.charity_id).reduce((sum, contribution) => sum + Number(contribution.amount), 0);
+  const nextDrawMonth = new Date();
+  nextDrawMonth.setDate(1);
+  nextDrawMonth.setHours(0, 0, 0, 0);
+  if (latestPublishedDraw?.month) {
+    const latestMonth = new Date(`${latestPublishedDraw.month}T00:00:00`);
+    if (latestMonth >= nextDrawMonth) nextDrawMonth.setMonth(nextDrawMonth.getMonth() + 1, 1);
+  }
   const nextDrawLabel = nextDrawMonth.toLocaleDateString(undefined, { year: "numeric", month: "long" });
   const renewalLabel = subscription?.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
 
@@ -45,7 +56,7 @@ export default async function DashboardPage({
     )}
     <div className="flex flex-col gap-6 border-b border-line pb-7 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="eyebrow">Your member space</p><h1 className="mt-3 font-display text-4xl sm:text-5xl">Welcome{profile?.full_name ? `, ${profile.full_name}` : " back"}.</h1><p className="mt-3 text-sm text-ink/55">Keep your latest five scores current, follow your draw participation, and see where your subscription is making an impact.</p></div>
-      <div className="flex flex-wrap gap-2"><Link href="/charities" className="btn-ghost px-4 py-2 text-xs">Explore charities</Link><Link href="/draws" className="btn-ghost px-4 py-2 text-xs">Draw archive</Link></div>
+      <div className="flex flex-wrap items-start gap-2"><Link href="/charities" className="btn-ghost px-4 py-2 text-xs">Explore charities</Link><Link href="/draws" className="btn-ghost px-4 py-2 text-xs">Draw archive</Link>{isActive && subscription?.stripe_customer_id && <BillingPortalButton />}</div>
     </div>
 
     <section className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -65,7 +76,7 @@ export default async function DashboardPage({
       </div>
 
       <div className="space-y-5">
-        <div className="rounded-card border border-fairway/10 bg-fairway p-6 text-white"><p className="font-mono text-[10px] uppercase tracking-[.18em] text-white/55">Your chosen cause</p><h2 className="mt-3 font-display text-3xl">{charityName ?? "Choose a charity"}</h2>{subscription ? <><p className="mt-3 text-sm leading-6 text-white/70">{subscription.charity_contribution_pct}% of your subscription fee is allocated to this cause.</p><div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4"><span className="text-xs text-white/55">Contribution setting</span><span className="font-mono text-lg">{subscription.charity_contribution_pct}%</span></div></> : <><p className="mt-3 text-sm leading-6 text-white/70">Pick a cause as part of your subscription setup.</p><Link href="/charities" className="mt-5 inline-flex rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-fairway">Choose a charity →</Link></>}</div>
+        <div className="rounded-card border border-fairway/10 bg-fairway p-6 text-white"><p className="font-mono text-[10px] uppercase tracking-[.18em] text-white/55">Your chosen cause</p><h2 className="mt-3 font-display text-3xl">{charityName ?? "Choose a charity"}</h2>{subscription ? <><p className="mt-3 text-sm leading-6 text-white/70">{subscription.charity_contribution_pct}% of each paid subscription invoice is allocated to this cause.</p><div className="mt-5 grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-2"><div className="flex items-center justify-between gap-3"><span className="text-xs text-white/55">Contribution setting</span><span className="font-mono text-lg">{subscription.charity_contribution_pct}%</span></div><div className="flex items-center justify-between gap-3"><span className="text-xs text-white/55">Recorded impact</span><span className="font-mono text-lg">${recordedCharityContributions.toFixed(2)}</span></div></div></> : <><p className="mt-3 text-sm leading-6 text-white/70">Pick a cause as part of your subscription setup.</p><Link href="/charities" className="mt-5 inline-flex rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-fairway">Choose a charity →</Link></>}</div>
         <div className="panel p-6"><div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Participation</p><h2 className="mt-2 font-display text-2xl">Your draw history</h2></div><span className="number-chip">{entryCount}</span></div><p className="mt-3 text-xs text-ink/50">{isActive ? `You have an active subscription. Next monthly draw: ${nextDrawLabel}.` : "No active subscription means new draw participation is paused."}</p>{drawEntries?.length ? <ul className="mt-5 divide-y divide-line">{drawEntries.slice(0,4).map((e:any)=><li key={e.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-medium">{e.draws?.month ? new Date(e.draws.month + "T00:00:00").toLocaleDateString(undefined,{year:"numeric",month:"short"}) : "Published draw"}</p><p className="mt-1 text-[10px] text-ink/45">{e.draws?.draw_type ?? "Monthly"} draw</p></div><span className={e.matched_tier ? "stamp-fairway" : "stamp-sand"}>{e.matched_tier ? `${e.matched_tier}-match` : "No match"}</span></li>)}</ul> : <p className="mt-5 rounded-xl bg-paper p-4 text-xs text-ink/50">Your published draw participation will appear here.</p>}</div>
       </div>
     </section>

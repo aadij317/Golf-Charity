@@ -35,8 +35,8 @@ or subscriptions.
 | --- | --- |
 | §04 Subscription & Payment | Stripe Checkout (`/subscribe`, `app/api/subscribe`), lifecycle sync via webhook (`app/api/webhooks/stripe`), real-time active-subscription check on every gated request (`lib/subscription.ts`) |
 | §05 Score Management | `app/dashboard` + `app/api/scores` — 1–45 range, one score per date, edit via re-submit, **delete** via `DELETE /api/scores?id=`, 5-score rolling limit enforced by a DB trigger (`0001_init_schema.sql`) |
-| §06/§07 Draw & Reward | `app/api/draws/run` — random and algorithmic (`favor_rare`/`favor_common`) draws, simulate vs. publish, prize pool split **40/35/25** across 5/4/3-match tiers, jackpot rollover on the 5-match tier only |
-| §08 Charity System | `/charities` directory + detail pages, 10% minimum contribution (enforced by a DB check constraint), independent `donations` table |
+| §06/§07 Draw & Reward | `app/api/draws/run` — random and algorithmic (`favor_rare`/`favor_common`) draws, server-owned simulation snapshots, exact-preview publishing, integer-cent prize allocation, prize pool split **40/35/25** across 5/4/3-match tiers, jackpot rollover on the 5-match tier only |
+| §08 Charity System | `/charities` directory + detail pages, 10% minimum contribution (enforced by a DB check constraint), independent `donations` table, and an immutable paid-Stripe-invoice charity contribution ledger |
 | §09 Winner Verification | `app/dashboard/proof-upload.tsx` (subscriber uploads proof to a private Storage bucket) + `app/admin/winners` (approve/reject, mark paid) |
 | §10 User Dashboard | `app/dashboard` — subscription status, score entry/edit/delete, selected charity + contribution %, **participation summary** (draws entered + next draw date), **winnings overview** (total won, per-win payment status) |
 | §11 Admin Dashboard | `app/admin/*` — users, draws, charities, winners, reports |
@@ -66,12 +66,10 @@ Flagged here per the brief, since ambiguity-resolution is scored under
   confirmed), draw publish (results + winner alerts), and winner
   verification/payout status changes.
 - **Winner proof updates are DB-guarded.** Migration `0004` prevents a subscriber from changing prize, payment, or approval data; they can only update their own proof while the verification state remains pending. Admin transitions remain available.
-- **Reports don't total the per-subscription charity percentage.** See
-  the in-app note on `/admin/reports` — the 10%+ charity share is a
-  percentage stored on the `subscriptions` row, not a transaction, so
-  there's no ledger to sum. The report only totals the independent
-  `donations` table and says so, rather than silently estimating a
-  number that would look like a real total.
+- **Charity contribution accounting is invoice-backed.** `invoice.paid` /
+  `invoice.payment_succeeded` webhooks write one immutable ledger row per
+  Stripe invoice (idempotent by invoice ID). Reports and the member dashboard
+  show recorded money separately from the contribution percentage setting.
 - **Subscription override is manual-only, deliberately narrow.**
   `/admin/users/[id]` lets an admin set `plan`/`status` directly but never
   touches `stripe_customer_id`, `stripe_subscription_id`, or
@@ -123,7 +121,7 @@ Visit `http://localhost:3000`.
 
 Storage buckets used by the app (`charity-images`, `winner-proofs`) are
 created and hardened by the numbered migrations in `supabase/migrations/` —
-run all five, in order, against your Supabase project before `npm run seed`.
+run all six, in order, against your Supabase project before `npm run seed`.
 
 ---
 
@@ -148,11 +146,12 @@ Final acceptance checklist (run against the target environment before submission
   1–45 range validated client- and DB-side, duplicate-date insert is an
   upsert (edit), delete removes a single entry, both blocked with a
   clear 403 while the subscription isn't active
-- Draw simulation vs. publish — simulate never writes; publish is
-  disabled until a simulation has succeeded and publishes the exact five
-  numbers shown in the preview; a re-publish of the same month/type
-  surfaces the backend's `409` as "already published"; prize pool splits
-  40/35/25 with 5-match-only jackpot rollover
+- Draw simulation vs. publish — simulate creates a short-lived server-owned review snapshot; publish is
+  disabled until a simulation has succeeded, requires explicit confirmation,
+  and publishes the exact subscribers, scores, numbers and prize allocation
+  shown in that preview; only one draw can be published per calendar month;
+  prize money is allocated in integer cents and the 5-match-only rollover is
+  carried from the latest earlier published draw
 - Charity CRUD — create/edit/delete/feature-toggle, image upload
 - Winner verification flow — subscriber uploads proof from their
   dashboard (private Storage bucket, RLS-scoped to owner or admin) →
@@ -171,5 +170,5 @@ Final acceptance checklist (run against the target environment before submission
 **Not smoke-tested in a sandboxed build environment** (needs a live
 Supabase project and Stripe/Resend keys): the actual `/api/draws/run`
 call end-to-end, real image/proof upload round-trips, Stripe-driven
-subscription status changes, and real email delivery. See
+subscription status changes, and real email delivery. Also verify the Stripe Billing Portal is enabled and test a real cancellation/renewal. See
 `DEPLOYMENT_CHECKLIST.md` §5 for how to verify all of these post-deploy.

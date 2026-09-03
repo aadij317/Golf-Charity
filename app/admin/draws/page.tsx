@@ -58,7 +58,7 @@ export default async function DrawsPage() {
               {(!draws || draws.length === 0) && (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-ink/40">
-                    No draws yet — run a simulation to get started.
+                    No published draws yet — simulate, review, then publish the first monthly draw.
                   </td>
                 </tr>
               )}

@@ -11,9 +11,9 @@ export type DrawRunResult = {
 };
 
 /**
- * This workstream doesn't own /api/draws/run's matching/prize logic (the
- * backend workstream does, per its README) — this action is purely a
- * thin, authenticated bridge from the admin UI to that existing route.
+ * Thin authenticated bridge from the admin UI to the draw engine. The route
+ * owns all matching, snapshot and financial logic; this action only forwards
+ * the admin session.
  * It forwards the admin's own session cookie so the route's own
  * profiles.role check runs against a real admin session rather than this
  * UI asserting admin-ness on the route's behalf.
@@ -23,7 +23,7 @@ export async function runDraw(params: {
   month: string;
   draw_type: "random" | "algorithmic";
   algorithm_weighting?: "favor_rare" | "favor_common";
-  winning_numbers?: number[];
+  simulation_id?: string;
 }): Promise<DrawRunResult> {
   await requireAdmin();
 

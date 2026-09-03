@@ -29,6 +29,7 @@ export default function WinnerRow({ winner }: { winner: Winner }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   function verify(status: "approved" | "rejected") {
+    if (!window.confirm(status === "approved" ? "Approve this proof and winner claim?" : "Reject this winner claim? The subscriber can upload replacement proof.")) return;
     setError(null);
     startTransition(async () => {
       const res = await setVerificationStatus(winner.id, status);
@@ -37,6 +38,7 @@ export default function WinnerRow({ winner }: { winner: Winner }) {
   }
 
   function pay(status: "pending" | "paid") {
+    if (!window.confirm(status === "paid" ? `Mark this $${Number(winner.prize_amount).toFixed(2)} prize as paid?` : "Revert this payout to pending?")) return;
     setError(null);
     startTransition(async () => {
       const res = await setPaymentStatus(winner.id, status);

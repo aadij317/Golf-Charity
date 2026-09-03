@@ -94,20 +94,19 @@ to a **new** Vercel project against a **new** Supabase project.
 - [ ] `/admin/draws` → Simulate, note the five previewed numbers, then
       Publish → the exact same five numbers appear in `/draws` (public) and
       in each entered subscriber's dashboard participation list; re-running
-      the same month/type shows "already published" instead of erroring.
+      the same month shows "already published" instead of erroring.
 - [ ] Draw-published and winner-alert emails arrive for entrants/winners
       (or log as `[email:noop]` without a configured provider).
 - [ ] If you were a winner in that draw: `/dashboard` → upload a proof
       screenshot → appears in `/admin/winners` for that user.
 - [ ] `/admin/winners` → approve → mark paid → status updates immediately,
       and the subscriber's dashboard reflects the new payment status.
-- [ ] `/admin/reports` → figures are non-zero if seed/test data is present.
+- [ ] `/admin/reports` → figures reconcile with paid winners, the current rollover, and paid Stripe-invoice charity contribution ledger entries.
 
 ## 6. Known, documented simplifications
 
 See `README.md` §"What's simplified vs. full spec, and why" for the
-deliberate trade-offs (algorithmic weighting direction, charity
-percentage reporting, subscription override scope, etc.) — those are
+deliberate trade-offs (algorithmic weighting direction and subscription override scope, etc.) — those are
 flagged there rather than repeated here.
 
 No automated test suite was added (out of scope for a trainee-assignment

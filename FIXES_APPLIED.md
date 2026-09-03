@@ -17,12 +17,13 @@ This pass focused on concrete production and UX gaps visible in the current code
 - Existing dashboard cards, score flow, participation history, charity impact, and winnings remain intact.
 
 ## Subscription and Stripe hardening
-- `/api/subscribe` now blocks creating a second Checkout session for an already-active subscription, reducing duplicate paid-subscription risk.
+- `/api/subscribe` now blocks an already-active subscription and also uses a database-backed short-lived checkout lock, closing the concurrent-click race that could otherwise create two paid Stripe subscriptions before the first webhook arrives.
+- Subscribers can open Stripe Billing Portal from the dashboard to manage cancellation and billing details without directly mutating subscription truth in the browser.
 - Subscription webhook confirmation email failures are isolated from subscription persistence so an email-provider outage does not make Stripe retry an otherwise successful state change.
 - Stripe subscription update/delete database errors are now checked instead of being silently ignored.
 
 ## Score API hardening
-- Score dates now reject impossible calendar values, not only invalid string formats.
+- Score dates now reject impossible calendar values and future dates, both in the API and at the database trigger layer.
 - Direct score deletion is now subscription-gated as well, matching the UI and stated business rule instead of allowing a lapsed user to bypass the disabled delete control with a direct API call.
 
 ## Winner proof upload hardening
@@ -48,10 +49,13 @@ Run these against the actual Supabase/Stripe project because they require live c
 
 
 ## Final pre-GitHub audit additions
-- Draw publication now uses the exact five numbers shown in the successful simulation preview; changing month/type/weighting invalidates the preview.
+- Draw simulation now creates a short-lived server-owned snapshot containing the exact eligible subscribers, score matches, winning numbers, prize allocation and rollover. Publish consumes that snapshot, so data cannot silently change between preview and publish.
+- Only one draw can be published per calendar month, and backfilling an older month after a later published draw is blocked to preserve rollover order.
+- Prize pools and individual payouts are calculated in integer cents with deterministic remainder allocation, eliminating floating-point rounding drift.
 - Draw month input is constrained to a calendar month and the backend accepts only `YYYY-MM-01`.
 - Publish failures after creating a draw now clean up the draw and cascading entries/winners instead of leaving partial draw state. Duplicate-race errors map to the same 409 already shown in the UI.
 - Stripe Checkout creation now uses a deterministic idempotency key to protect against double-click/network retry duplicate sessions.
 - Final database migration `0005_final_production_hardening.sql` makes security-sensitive profile fields immutable to subscribers, fixes winner-proof orphan cleanup permissions, and makes winner primary keys immutable for subscriber updates.
+- New migration `0006_final_financial_and_draw_hardening.sql` adds an immutable paid-invoice charity ledger, simulation snapshots, checkout locks, future-score protection and database-level winner state-machine checks.
 - Admin charity image uploads now validate image MIME type and a 10 MB size limit.
 - Charity detail CTAs now respect auth/subscription state instead of offering a redundant checkout to an already-active member.

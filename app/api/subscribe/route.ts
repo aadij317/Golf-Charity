@@ -97,6 +97,56 @@ export async function POST(req: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.origin}`;
 
+  // Prevent concurrent checkout sessions for the same user. The unique user_id
+  // lock closes the race where two different Subscribe clicks could create two
+  // Stripe subscriptions before the first webhook writes the subscription row.
+  const checkoutWindowMs = 10 * 60 * 1000;
+  const idempotencyWindow = Math.floor(Date.now() / checkoutWindowMs);
+  // Keep expires_at deterministic within the same idempotency window. Stripe
+  // requires repeated requests using one idempotency key to have identical
+  // parameters; this also guarantees at least 40 minutes before expiry.
+  const lockExpiresAt = new Date((idempotencyWindow + 5) * checkoutWindowMs);
+  const { data: existingLock, error: existingLockError } = await admin
+    .from("subscription_checkout_locks")
+    .select("stripe_session_id, expires_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (existingLockError) return NextResponse.json({ error: existingLockError.message }, { status: 500 });
+
+  if (existingLock) {
+    const expired = new Date(existingLock.expires_at).getTime() <= Date.now();
+    if (!expired) {
+      return NextResponse.json({ error: "A checkout session is already in progress. Finish it or wait for it to expire before trying again." }, { status: 409 });
+    }
+
+    // If a paid Checkout session completed near the lock expiry, keep the lock
+    // until its webhook syncs the subscription rather than risking a second
+    // paid membership during webhook delivery delay.
+    if (existingLock.stripe_session_id) {
+      try {
+        const existingSession = await getStripe().checkout.sessions.retrieve(existingLock.stripe_session_id);
+        if (existingSession.status === "complete" || existingSession.payment_status === "paid") {
+          return NextResponse.json({ error: "Your checkout completed and is still being confirmed. Refresh your dashboard shortly instead of starting another subscription." }, { status: 409 });
+        }
+      } catch (sessionLookupError) {
+        return NextResponse.json({ error: "Could not verify the previous checkout session. Please try again in a few minutes." }, { status: 409 });
+      }
+    }
+
+    const { error: deleteExpiredLockError } = await admin.from("subscription_checkout_locks").delete().eq("user_id", user.id);
+    if (deleteExpiredLockError) return NextResponse.json({ error: deleteExpiredLockError.message }, { status: 500 });
+  }
+
+  const { error: lockError } = await admin
+    .from("subscription_checkout_locks")
+    .insert({ user_id: user.id, expires_at: lockExpiresAt.toISOString() });
+  if (lockError) {
+    if (lockError.code === "23505") {
+      return NextResponse.json({ error: "A checkout session is already in progress. Finish it or wait for it to expire before trying again." }, { status: 409 });
+    }
+    return NextResponse.json({ error: lockError.message }, { status: 500 });
+  }
+
   try {
     const stripe = getStripe();
 
@@ -115,7 +165,6 @@ export async function POST(req: NextRequest) {
     // from creating two Checkout sessions for the same subscription choice.
     // Use a short time bucket: repeated clicks share one session, while a
     // genuinely abandoned/expired checkout can be retried shortly after.
-    const idempotencyWindow = Math.floor(Date.now() / (10 * 60 * 1000));
     const idempotencyKey = createHash("sha256")
       .update(`${user.id}:${plan}:${charity_id}:${contributionPct}:${idempotencyWindow}`)
       .digest("hex");
@@ -141,10 +190,18 @@ export async function POST(req: NextRequest) {
           contribution_pct: String(contributionPct),
         },
       },
+      expires_at: Math.floor(lockExpiresAt.getTime() / 1000),
     }, { idempotencyKey });
+
+    const { error: lockUpdateError } = await admin
+      .from("subscription_checkout_locks")
+      .update({ stripe_session_id: session.id, expires_at: lockExpiresAt.toISOString() })
+      .eq("user_id", user.id);
+    if (lockUpdateError) throw new Error(lockUpdateError.message);
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (e: any) {
+    await admin.from("subscription_checkout_locks").delete().eq("user_id", user.id);
     return NextResponse.json({ error: e.message ?? "Stripe error" }, { status: 500 });
   }
 }

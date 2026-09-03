@@ -3,51 +3,56 @@ import PageHeader from "@/components/admin/page-header";
 import StatCard from "@/components/admin/stat-card";
 import TierChart from "./tier-chart";
 
+const money = (value: number) => `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 export default async function ReportsPage() {
   const supabase = createClient();
+  const now = new Date().toISOString();
 
   const [
     { count: totalUsers },
     { count: activeSubs },
     { data: winners },
-    { data: donations },
+    { data: independentDonations },
+    { data: subscriptionContributions },
     { data: draws },
+    { count: simulationCount },
     { data: latestDraw },
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("subscriptions").select("*", { count: "exact", head: true }).eq("status", "active"),
-    supabase.from("winners").select("tier, prize_amount, payment_status"),
+    supabase.from("subscriptions").select("*", { count: "exact", head: true }).eq("status", "active").or(`current_period_end.is.null,current_period_end.gt.${now}`),
+    supabase.from("winners").select("tier, prize_amount, payment_status, verification_status"),
     supabase.from("donations").select("amount"),
+    supabase.from("subscription_charity_contributions").select("amount"),
     supabase.from("draws").select("status"),
-    supabase
-      .from("draws")
-      .select("jackpot_rollover_amount")
-      .order("month", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("draw_simulations").select("*", { count: "exact", head: true }).is("published_at", null).gt("expires_at", now),
+    supabase.from("draws").select("jackpot_rollover_amount").eq("status", "published").order("month", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
-  const totalPrizesPaid =
-    winners?.filter((w) => w.payment_status === "paid").reduce((sum, w) => sum + Number(w.prize_amount), 0) ?? 0;
-  const totalPrizesPending =
-    winners?.filter((w) => w.payment_status === "pending").reduce((sum, w) => sum + Number(w.prize_amount), 0) ?? 0;
-  const totalDonations = donations?.reduce((sum, d) => sum + Number(d.amount), 0) ?? 0;
+  const eligibleWinners = (winners ?? []).filter((winner) => winner.verification_status !== "rejected");
+  const totalPrizesPaid = eligibleWinners.filter((winner) => winner.payment_status === "paid").reduce((sum, winner) => sum + Number(winner.prize_amount), 0);
+  const totalPrizesPending = eligibleWinners.filter((winner) => winner.payment_status !== "paid").reduce((sum, winner) => sum + Number(winner.prize_amount), 0);
   const totalPrizePoolAwarded = totalPrizesPaid + totalPrizesPending;
 
-  const drawsByStatus = { draft: 0, simulated: 0, published: 0 };
-  draws?.forEach((d) => {
-    if (d.status in drawsByStatus) drawsByStatus[d.status as keyof typeof drawsByStatus]++;
+  const independentTotal = (independentDonations ?? []).reduce((sum, donation) => sum + Number(donation.amount), 0);
+  const subscriptionContributionTotal = (subscriptionContributions ?? []).reduce((sum, contribution) => sum + Number(contribution.amount), 0);
+  const totalCharityContributions = independentTotal + subscriptionContributionTotal;
+
+  const drawsByStatus = { draft: 0, published: 0 };
+  draws?.forEach((draw) => {
+    if (draw.status in drawsByStatus) drawsByStatus[draw.status as keyof typeof drawsByStatus]++;
   });
 
   const tierCounts = { "5": 0, "4": 0, "3": 0 };
-  winners?.forEach((w) => {
-    if (w.tier in tierCounts) tierCounts[w.tier as keyof typeof tierCounts]++;
+  eligibleWinners.forEach((winner) => {
+    if (winner.tier in tierCounts) tierCounts[winner.tier as keyof typeof tierCounts]++;
   });
   const tierData = [
     { tier: "5-match", winners: tierCounts["5"] },
     { tier: "4-match", winners: tierCounts["4"] },
     { tier: "3-match", winners: tierCounts["3"] },
   ];
+  const hasWinners = tierData.some((item) => item.winners > 0);
 
   return (
     <div>
@@ -55,60 +60,35 @@ export default async function ReportsPage() {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total users" value={String(totalUsers ?? 0)} sub={`${activeSubs ?? 0} active subscribers`} />
-        <StatCard
-          label="Prize pool awarded"
-          value={`$${totalPrizePoolAwarded.toLocaleString()}`}
-          sub={`$${totalPrizesPaid.toLocaleString()} paid · $${totalPrizesPending.toLocaleString()} pending`}
-        />
-        <StatCard
-          label="Charity contributions"
-          value={`$${totalDonations.toLocaleString()}`}
-          sub="Independent donations only — see note below"
-        />
-        <StatCard
-          label="Current jackpot rollover"
-          value={`$${Number(latestDraw?.jackpot_rollover_amount ?? 0).toLocaleString()}`}
-          sub="Most recent month on record"
-        />
+        <StatCard label="Prize pool awarded" value={money(totalPrizePoolAwarded)} sub={`${money(totalPrizesPaid)} paid · ${money(totalPrizesPending)} pending`} />
+        <StatCard label="Charity contributions" value={money(totalCharityContributions)} sub={`${money(subscriptionContributionTotal)} from subscriptions · ${money(independentTotal)} direct`} />
+        <StatCard label="Current jackpot rollover" value={money(Number(latestDraw?.jackpot_rollover_amount ?? 0))} sub="Latest published draw" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="panel p-5">
           <h2 className="mb-4 font-display text-lg italic text-ink">Winners by tier</h2>
-          <TierChart data={tierData} />
+          {hasWinners ? (
+            <TierChart data={tierData} />
+          ) : (
+            <div className="grid h-[240px] place-items-center rounded-xl border border-dashed border-line bg-paper/35 p-8 text-center">
+              <div><p className="font-display text-xl">No winners yet.</p><p className="mt-2 text-xs text-ink/50">The chart will populate when a published draw produces a winner claim.</p></div>
+            </div>
+          )}
         </div>
 
         <div className="panel p-5">
           <h2 className="mb-4 font-display text-lg italic text-ink">Draw statistics</h2>
           <dl className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-ink/60">Published</dt>
-              <dd className="score-num text-ink">{drawsByStatus.published}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-ink/60">Simulated</dt>
-              <dd className="score-num text-ink">{drawsByStatus.simulated}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-ink/60">Draft</dt>
-              <dd className="score-num text-ink">{drawsByStatus.draft}</dd>
-            </div>
+            <div className="flex justify-between"><dt className="text-ink/60">Published</dt><dd className="score-num text-ink">{drawsByStatus.published}</dd></div>
+            <div className="flex justify-between"><dt className="text-ink/60">Active simulations</dt><dd className="score-num text-ink">{simulationCount ?? 0}</dd></div>
+            <div className="flex justify-between"><dt className="text-ink/60">Draft</dt><dd className="score-num text-ink">{drawsByStatus.draft}</dd></div>
           </dl>
         </div>
       </div>
 
-      <p className="mt-6 max-w-2xl text-xs leading-relaxed text-ink/40">
-        Note: &ldquo;Charity contributions&rdquo; above totals the independent{" "}
-        <code className="font-mono">donations</code> table only. The per-subscription charity
-        share (min. 10% of the fee, per PRD §08) isn&apos;t written to its own ledger row
-        anywhere in the locked schema — it&apos;s a percentage on the{" "}
-        <code className="font-mono">subscriptions</code> row, not a transaction — so it isn&apos;t
-        summed into this figure. Wiring that up would mean either the Stripe webhook
-        (backend workstream) writing a donation-equivalent row per billing cycle, or this
-        report estimating it as{" "}
-        <code className="font-mono">active_subscribers × fee × avg(charity_contribution_pct)</code>{" "}
-        — flagged rather than silently estimated, since an estimate presented as a real total
-        would be misleading in a finance report.
+      <p className="mt-6 max-w-2xl text-xs leading-relaxed text-ink/50">
+        Charity contributions are now based on immutable paid-invoice ledger entries plus independent direct donations. A subscription percentage alone is never presented as money until Stripe confirms that the invoice was actually paid.
       </p>
     </div>
   );
