@@ -1,0 +1,3 @@
+"use client";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+export default function TierChart({data}:{data:{tier:string;winners:number}[]}){return <ResponsiveContainer width="100%" height={240}><BarChart data={data}><CartesianGrid stroke="#E6E1D7" vertical={false}/><XAxis dataKey="tier" tick={{fill:"#6D746F",fontSize:12}} axisLine={{stroke:"#E6E1D7"}} tickLine={false}/><YAxis allowDecimals={false} tick={{fill:"#6D746F",fontSize:12}} axisLine={{stroke:"#E6E1D7"}} tickLine={false}/><Tooltip contentStyle={{background:"#fff",border:"1px solid #E6E1D7",borderRadius:12,fontSize:12}} cursor={{fill:"#174A3910"}}/><Bar dataKey="winners" fill="#174A39" radius={[10,10,0,0]}/></BarChart></ResponsiveContainer>}

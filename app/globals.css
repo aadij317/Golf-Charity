@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-line; }
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-paper text-ink;
+    background-image:
+      radial-gradient(circle at 8% 0%, rgba(185,144,63,.09), transparent 30rem),
+      radial-gradient(circle at 92% 20%, rgba(23,74,57,.05), transparent 28rem),
+      linear-gradient(180deg,#fffdfa 0%,#fbf9f4 100%);
+    min-height: 100vh;
+  }
+  ::selection { @apply bg-sand/20 text-ink; }
+  :focus-visible { outline: 2px solid theme("colors.fairway.DEFAULT"); outline-offset: 3px; }
+  input[type="range"] { accent-color: #174A39; }
+}
+
+@layer components {
+  .site-shell { @apply mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12; }
+  .page-wrap { @apply site-shell pb-14 pt-7 sm:pt-10; }
+  .panel { @apply rounded-card border border-line/90 bg-white shadow-soft; }
+  .panel-muted { @apply rounded-card border border-line/80 bg-paper/80; }
+  .score-row { @apply border-b border-line/80 last:border-b-0; }
+  .score-num { @apply font-mono tabular-nums text-sm; }
+  .stamp { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize; }
+  .stamp-fairway { @apply stamp border-fairway/15 bg-fairway/10 text-fairway; }
+  .stamp-flag { @apply stamp border-flag/15 bg-flag/10 text-flag; }
+  .stamp-sand { @apply stamp border-sand/25 bg-sand/10 text-[#85651f]; }
+  .btn-primary { @apply inline-flex items-center justify-center rounded-xl bg-fairway px-5 py-3 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-fairway-soft hover:shadow-soft active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40; }
+  .btn-ghost { @apply inline-flex items-center justify-center rounded-xl border border-[#DCD8CE] bg-white px-5 py-3 text-sm font-semibold text-ink transition duration-200 hover:-translate-y-0.5 hover:border-fairway/30 hover:bg-paper active:translate-y-0; }
+  .input { @apply rounded-xl border border-[#E1DDD3] bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm placeholder:text-ink/35 transition focus:border-fairway/50 focus:outline-none focus:ring-2 focus:ring-fairway/10; }
+  .eyebrow { @apply font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8A7240]; }
+  .section-title { @apply font-display text-3xl leading-tight text-ink sm:text-4xl; }
+  .nav-link { @apply text-xs font-medium text-ink/60 transition hover:text-fairway; }
+  .photo-card { @apply overflow-hidden rounded-card border border-line bg-white shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(38,54,47,.10)]; }
+  .photo-cover { @apply h-40 w-full bg-cover bg-center transition duration-500 group-hover:scale-[1.04]; }
+  .metric-label { @apply text-[10px] font-mono uppercase tracking-[.13em] text-ink/40; }
+  .metric-value { @apply mt-2 font-display text-3xl leading-none text-ink; }
+  .number-chip { @apply grid h-10 w-10 place-items-center rounded-xl border border-fairway/10 bg-fairway/5 font-mono text-sm font-semibold text-fairway; }
+  .section-divider { @apply my-8 border-t border-line/80; }
+}

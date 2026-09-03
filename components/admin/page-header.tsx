@@ -1,0 +1,1 @@
+export default function PageHeader({eyebrow,title,action}:{eyebrow:string;title:string;action?:React.ReactNode}){return <div className="mb-8 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow">{eyebrow}</p><h1 className="mt-2 font-display text-4xl text-ink">{title}</h1></div>{action}</div>}
